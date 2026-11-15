@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: lol-classement
+    runtime: node
+    plan: free
+    buildCommand: "echo ok"
+    startCommand: node server.js
+    envVars:
+      - key: RIOT_API_KEY
+        sync: false
+      - key: ADMIN_KEY
+        sync: false
+      - key: PLATFORM
+        value: euw1
+      - key: REGION
+        value: europe

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classement LoL des potes</title>
+<style>
+  :root {
+    --bg: #0a0e14; --panel: #111823; --line: #1f2a38; --text: #e6edf3; --muted: #7d8b9c;
+    --gold: #c8aa6e; --win: #3fb68b; --loss: #e05561;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  h1 { margin: 0; font-size: 28px; letter-spacing: .5px; }
+  h1 span { color: var(--gold); }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tabs { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tabs button { background: none; border: 0; color: var(--muted); padding: 8px 14px; cursor: pointer; font: inherit; }
+  .tabs button.on { background: var(--gold); color: #111; font-weight: 600; }
+  .btn { background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; }
+  .btn:hover { border-color: var(--gold); }
+  form { display: flex; gap: 8px; margin-bottom: 16px; }
+  form input { flex: 1; background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 10px 12px; border-radius: 8px; font: inherit; }
+  form input:focus { outline: none; border-color: var(--gold); }
+  .msg { min-height: 18px; font-size: 13px; color: var(--loss); margin: -8px 0 12px; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .row { display: grid; grid-template-columns: 40px 1fr 190px 120px 28px; align-items: center; gap: 12px;
+         background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  .row.top1 { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .pos { font-size: 20px; font-weight: 700; color: var(--muted); text-align: center; }
+  .top1 .pos { color: var(--gold); }
+  .player { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .player img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--line); }
+  .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name small { color: var(--muted); font-weight: 400; }
+  .lvl { color: var(--muted); font-size: 12px; }
+  .rank { display: flex; align-items: center; gap: 8px; }
+  .rank img { width: 34px; height: 34px; }
+  .tier { font-weight: 700; }
+  .lp { color: var(--muted); font-size: 13px; }
+  .wr { font-size: 13px; }
+  .bar { height: 5px; background: var(--loss); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .bar div { height: 100%; background: var(--win); }
+  .del { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; opacity: .4; }
+  .row:hover .del { opacity: 1; }
+  .del:hover { color: var(--loss); }
+  .empty { text-align: center; color: var(--muted); padding: 40px; border: 1px dashed var(--line); border-radius: 10px; }
+  .err { color: var(--loss); font-size: 13px; }
+  @media (max-width: 640px) {
+    .row { grid-template-columns: 28px 1fr 28px; }
+    .rank, .wr-col { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Classement <span>LoL</span> des potes</h1>
+      <div class="sub" id="updated">Chargement…</div>
+    </div>
+    <div class="controls">
+      <div class="tabs">
+        <button data-q="solo" class="on">Solo/Duo</button>
+        <button data-q="flex">Flex</button>
+      </div>
+      <button class="btn" id="refresh">↻ Actualiser</button>
+    </div>
+  </header>
+
+  <form id="add">
+    <input id="riotId" placeholder="Ajouter un pote : Pseudo#EUW" autocomplete="off" required>
+    <button class="btn" type="submit">Ajouter</button>
+  </form>
+  <div class="msg" id="msg"></div>
+
+  <div class="list" id="list"></div>
+</div>
+
+<script>
+const TIERS = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+const TIER_FR = { IRON:'Fer', BRONZE:'Bronze', SILVER:'Argent', GOLD:'Or', PLATINUM:'Platine', EMERALD:'Émeraude',
+                  DIAMOND:'Diamant', MASTER:'Maître', GRANDMASTER:'Grand Maître', CHALLENGER:'Challenger' };
+const TIER_COLOR = { IRON:'#6b5d57', BRONZE:'#a0715e', SILVER:'#9aa4af', GOLD:'#d4af37', PLATINUM:'#4fb3a9', EMERALD:'#2dbd6e',
+                     DIAMOND:'#6f8dfa', MASTER:'#b05ad9', GRANDMASTER:'#e0504a', CHALLENGER:'#f4c874' };
+const DIVS = ['IV','III','II','I'];
+const ICON = (id) => `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${id}.jpg`;
+const CREST = (t) => `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/${t.toLowerCase()}.svg`;
+
+let queue = 'solo', data = null;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+function score(r) {
+  if (!r) return -1;
+  return TIERS.indexOf(r.tier) * 10000 + DIVS.indexOf(r.rank) * 1000 + r.lp;
+}
+
+function render() {
+  const list = $('#list');
+  if (!data) return;
+  if (!data.players.length) {
+    list.innerHTML = '<div class="empty">Aucun pote pour l\'instant. Ajoute un Riot ID au-dessus 👆</div>';
+    return;
+  }
+  const players = [...data.players].sort((a, b) => score(b[queue]) - score(a[queue]));
+  list.innerHTML = players.map((p, i) => {
+    const r = p[queue];
+    if (p.error) {
+      return `<div class="row"><div class="pos">–</div>
+        <div class="player"><div><div class="name">${esc(p.riotId)}</div><div class="err">${esc(p.error)}</div></div></div>
+        <div></div><div></div><button class="del" data-id="${esc(p.riotId)}" title="Retirer">✕</button></div>`;
+    }
+    const games = r ? r.wins + r.losses : 0;
+    const wr = games ? Math.round((r.wins / games) * 100) : 0;
+    const isApex = r && ['MASTER','GRANDMASTER','CHALLENGER'].includes(r.tier);
+    return `<div class="row ${i === 0 && r ? 'top1' : ''}">
+      <div class="pos">${r ? i + 1 : '–'}</div>
+      <div class="player">
+        <img src="${ICON(p.icon)}" alt="" loading="lazy">
+        <div style="min-width:0">
+          <div class="name">${esc(p.gameName)} <small>#${esc(p.tagLine)}</small></div>
+          <div class="lvl">Niveau ${p.level}</div>
+        </div>
+      </div>
+      <div class="rank">
+        ${r ? `<img src="${CREST(r.tier)}" alt="" onerror="this.remove()">
+          <div><div class="tier" style="color:${TIER_COLOR[r.tier]}">${TIER_FR[r.tier]}${isApex ? '' : ' ' + r.rank}${r.hotStreak ? ' 🔥' : ''}</div>
+          <div class="lp">${r.lp} LP</div></div>`
+          : '<div class="lp">Non classé</div>'}
+      </div>
+      <div class="wr-col">
+        ${r ? `<div class="wr">${wr}% <span class="lp">· ${r.wins}V ${r.losses}D</span></div>
+          <div class="bar"><div style="width:${wr}%"></div></div>` : ''}
+      </div>
+      <button class="del" data-id="${esc(p.riotId)}" title="Retirer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function updatedLabel() {
+  if (!data || !data.updatedAt) return;
+  const min = Math.round((Date.now() - data.updatedAt) / 60000);
+  $('#updated').textContent = min < 1 ? 'Mis à jour à l\'instant' : `Mis à jour il y a ${min} min`;
+}
+
+async function load(refresh = false) {
+  $('#updated').textContent = 'Chargement…';
+  try {
+    const res = await fetch('/api/leaderboard' + (refresh ? '?refresh' : ''));
+    data = await res.json();
+    render(); updatedLabel();
+  } catch {
+    $('#updated').textContent = 'Impossible de joindre le serveur';
+  }
+}
+
+document.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach((x) => x.classList.remove('on'));
+  b.classList.add('on'); queue = b.dataset.q; render();
+});
+$('#refresh').onclick = () => load(true);
+
+// Code admin (seulement si le serveur en demande un) : retenu dans ce navigateur
+function adminHeaders() {
+  let k = ''; try { k = localStorage.getItem('adminKey') || ''; } catch {}
+  return { 'Content-Type': 'application/json', 'X-Admin-Key': k };
+}
+async function withAdmin(doFetch) {
+  let res = await doFetch(adminHeaders());
+  if (res.status === 401) {
+    const k = prompt('Code admin pour modifier la liste :');
+    if (!k) return res;
+    try { localStorage.setItem('adminKey', k); } catch {}
+    res = await doFetch(adminHeaders());
+  }
+  return res;
+}
+
+$('#add').onsubmit = async (e) => {
+  e.preventDefault();
+  const riotId = $('#riotId').value.trim();
+  $('#msg').textContent = '';
+  const res = await withAdmin((headers) => fetch('/api/friends', { method: 'POST', headers, body: JSON.stringify({ riotId }) }));
+  const body = await res.json();
+  if (!res.ok) { $('#msg').textContent = body.error || 'Erreur'; return; }
+  $('#riotId').value = '';
+  load(true);
+};
+
+$('#list').onclick = async (e) => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (!id) return;
+  const res = await withAdmin((headers) => fetch('/api/friends?riotId=' + encodeURIComponent(id), { method: 'DELETE', headers }));
+  if (!res.ok) { $('#msg').textContent = 'Code admin incorrect'; return; }
+  load(true);
+};
+
+load();
+setInterval(updatedLabel, 30000);
+setInterval(() => load(), 5 * 60000); // rafraîchit tout seul toutes les 5 min
+</script>
+</body>
+</html>
