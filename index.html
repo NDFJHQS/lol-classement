@@ -54,7 +54,9 @@
   main.wrap { display: flex; flex-direction: column; gap: 36px; padding-block: 36px 56px; }
 
   /* Cartes de titres */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 960px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 480px) { .cards { grid-template-columns: minmax(0, 1fr); } }
   .card { position: relative; background: var(--surf); border: 1px solid var(--gold); padding: 20px 22px 18px; display: flex; flex-direction: column; gap: 4px; }
   .card::before { content: ""; position: absolute; top: -1px; left: 50%; width: 40px; height: 2px; margin-left: -20px; background: var(--accent); }
   .card .t { font-family: Cinzel, serif; font-size: 20px; font-weight: 700; }
@@ -103,8 +105,9 @@
   .mbar i { display: block; height: 100%; background: var(--accent); }
   .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .stat { padding: 12px 14px; background: var(--surf2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
-  .stat b { font-size: 22px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stat b { font-size: 22px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .stat span { font-size: 13px; color: var(--muted); }
+  .stat b.sm { font-size: 17px; }
   .remove { align-self: flex-start; background: none; border: 0; padding: 10px 0; color: var(--muted); font-size: 13px; text-decoration: underline; }
   .remove:hover { color: var(--bad); }
 
@@ -252,11 +255,11 @@ function renderFiche() {
   const mastery = p.mastery.length ? p.mastery.map((m) => `<div class="mrow">${hexChamp(m.id, m.name)}<div class="info"><div class="line"><span style="font-weight:600">${esc(m.name)}</span><span class="muted num" style="font-size:13px">${fmt(m.points)} pts · niv. ${m.level}</span></div><div class="mbar"><i style="width:${Math.round(m.points * 100 / mx)}%"></i></div></div></div>`).join('')
     : '<span class="muted">Pas de données de maîtrise.</span>';
   const rc = p.recent;
-  const stat = (k, v) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`;
+  const stat = (k, v, sm) => `<div class="stat"><span>${k}</span><b class="${sm ? 'sm' : ''}">${v}</b></div>`;
   const recent = rc ? `<div class="stats">
       ${stat('Victoires', Math.round(rc.wins * 100 / rc.games) + ' %')}
       ${stat('KDA', rc.kda)}
-      ${stat('K / D / A', `${rc.k}/${rc.d}/${rc.a}`)}
+      ${stat('K / D / A', `${rc.k} / ${rc.d} / ${rc.a}`, true)}
       ${stat('CS / min', rc.csMin)}
       ${stat('Vision', rc.vision)}
       ${stat('Durée moy.', rc.duration + ' min')}
